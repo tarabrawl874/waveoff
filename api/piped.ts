@@ -17,6 +17,8 @@ export async function searchTracks(query: string): Promise<Track[]> {
       if (!res.ok) continue;
 
       const data = await res.json();
+      console.log("API:", api);
+      console.log(data);
 
       return (data.items || [])
         .filter((item: any) => item.type === "stream")
