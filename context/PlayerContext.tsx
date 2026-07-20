@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { Audio } from "expo-av";
 import { Track } from "../types";
+import { getStreamUrl } from "../api/piped";
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -42,7 +43,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     return () => {
-      if (soundRef.current) soundRef.current.unloadAsync();
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
     };
   }, []);
 
@@ -53,25 +56,41 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         soundRef.current = null;
       }
 
-      if (!track.url) return;
+      let streamUrl = track.url;
+
+      if (!streamUrl) {
+        streamUrl = await getStreamUrl(track.id);
+
+        if (!streamUrl) {
+          console.log("No se pudo obtener la URL del audio");
+          return;
+        }
+
+        // Guardamos la URL para no volver a pedirla
+        track.url = streamUrl;
+      }
 
       setCurrentTrack(track);
 
       const { sound } = await Audio.Sound.createAsync(
-        { uri: track.url },
+        { uri: streamUrl },
         { shouldPlay: true },
         (status) => {
-          if (status.isLoaded) {
-            setPosition(status.positionMillis || 0);
-            setDuration(status.durationMillis || 0);
-            setIsPlaying(status.isPlaying || false);
-            if (status.didJustFinish) nextTrack();
+          if (!status.isLoaded) return;
+
+          setPosition(status.positionMillis ?? 0);
+          setDuration(status.durationMillis ?? 0);
+          setIsPlaying(status.isPlaying);
+
+          if (status.didJustFinish) {
+            nextTrack();
           }
         }
       );
 
       soundRef.current = sound;
       setIsPlaying(true);
+
     } catch (error) {
       console.log("Error playing track:", error);
     }
@@ -79,11 +98,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const togglePlay = async () => {
     if (!soundRef.current) return;
+
     if (isPlaying) {
       await soundRef.current.pauseAsync();
     } else {
       await soundRef.current.playAsync();
     }
+
     setIsPlaying(!isPlaying);
   };
 
@@ -94,14 +115,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const nextTrack = () => {
     if (!currentTrack || queue.length === 0) return;
+
     const idx = queue.findIndex(t => t.id === currentTrack.id);
-    if (idx < queue.length - 1) playTrack(queue[idx + 1]);
+
+    if (idx < queue.length - 1) {
+      playTrack(queue[idx + 1]);
+    }
   };
 
   const prevTrack = () => {
     if (!currentTrack || queue.length === 0) return;
+
     const idx = queue.findIndex(t => t.id === currentTrack.id);
-    if (idx > 0) playTrack(queue[idx - 1]);
+
+    if (idx > 0) {
+      playTrack(queue[idx - 1]);
+    }
   };
 
   const addToQueue = (track: Track) => {
@@ -112,15 +141,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <PlayerContext.Provider value={{
-      currentTrack, isPlaying, position, duration,
-      isPlayerOpen, queue,
-      playTrack, togglePlay, seekTo,
-      nextTrack, prevTrack,
-      openPlayer: () => setIsPlayerOpen(true),
-      closePlayer: () => setIsPlayerOpen(false),
-      addToQueue,
-    }}>
+    <PlayerContext.Provider
+      value={{
+        currentTrack,
+        isPlaying,
+        position,
+        duration,
+        isPlayerOpen,
+        queue,
+        playTrack,
+        togglePlay,
+        seekTo,
+        nextTrack,
+        prevTrack,
+        openPlayer: () => setIsPlayerOpen(true),
+        closePlayer: () => setIsPlayerOpen(false),
+        addToQueue,
+      }}
+    >
       {children}
     </PlayerContext.Provider>
   );
