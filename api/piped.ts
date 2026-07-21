@@ -1,5 +1,3 @@
-import { Track } from "../types";
-
 const PIPED_INSTANCES = [
   "https://pipedapi.kavin.rocks",
   "https://pipedapi.adminforge.de",
@@ -7,19 +5,16 @@ const PIPED_INSTANCES = [
   "https://pipedapi.r4fo.com",
 ];
 
-export async function searchTracks(query: string): Promise<Track[]> {
+export async function searchTracks(query: string): Promise<any[]> {
   for (const api of PIPED_INSTANCES) {
     try {
       const res = await fetch(
-        `${api}/search?q=${encodeURIComponent(query)}&filter=music_songs`
+        `${api}/search?q=${encodeURIComponent(query)}&filter=all`
       );
-
+      const text = await res.text();
+      alert(`API: ${api}\nStatus: ${res.status}\nRespuesta: ${text.slice(0, 200)}`);
       if (!res.ok) continue;
-
-      const data = await res.json();
-      console.log("API:", api);
-      console.log(data);
-
+      const data = JSON.parse(text);
       return (data.items || [])
         .filter((item: any) => item.type === "stream")
         .slice(0, 20)
@@ -30,12 +25,10 @@ export async function searchTracks(query: string): Promise<Track[]> {
           thumbnail: item.thumbnail || "",
           duration: item.duration || 0,
         }));
-
-    } catch {
-      // prueba la siguiente instancia
+    } catch (e: any) {
+      alert(`Error en ${api}: ${e.message}`);
     }
   }
-
   return [];
 }
 
@@ -43,23 +36,13 @@ export async function getStreamUrl(videoId: string): Promise<string | null> {
   for (const api of PIPED_INSTANCES) {
     try {
       const res = await fetch(`${api}/streams/${videoId}`);
-
       if (!res.ok) continue;
-
       const data = await res.json();
-
       const audio = data.audioStreams
         ?.filter((s: any) => s.mimeType?.includes("audio"))
         ?.sort((a: any, b: any) => b.bitrate - a.bitrate)[0];
-
-      if (audio?.url) {
-        return audio.url;
-      }
-
-    } catch {
-      // prueba la siguiente instancia
-    }
+      if (audio?.url) return audio.url;
+    } catch {}
   }
-
   return null;
 }
