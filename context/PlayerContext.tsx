@@ -40,7 +40,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       playThroughEarpieceAndroid: false,
     });
   }, []);
-
+/*
   useEffect(() => {
     return () => {
       if (soundRef.current) {
@@ -48,7 +48,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, []);
-
+*/
   const playTrack = async (track: Track) => {
     try {
       if (soundRef.current) {
